@@ -1,61 +1,52 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from input_data import n, m, X
-
-# Задание 4
-# Входные данные: X, shape=(N, M). N - число точек, M - число координат
-# 1. Генератор точек Парето (P) фронта
-# 2. Нарисовать X, P в 'полярных' координатах (M осей)
-# Общие замечание: все по возможности векторизовать в numpy до 2D матриц
-
-# Вектор x' называется оптимальным по Парето, если не существует x такого, что
-# f_i(x') <= f_i(x) для всех i = 1, ..., k, и f_i(x) < f_i(x') хотя бы для
-# одного i. 
-
-# 1. Берём X, 
-# 2. Проходим по каждому столбцу, проверяем по Парето
-# Как проверять по Парето:
-# 1) берём столбец из X, пока не закончатся, когда пройдём по всем, истина
-# 2) если хотя бы одна координата исходного вектора > другого, 
-# то первый шаг, иначе ложь
-# 3. если вектор удовлетворяет Парето, возвращаем его
+from input_data import n, m, scaler, X
 
 
 def is_pareto(idx, X):
-    for i, col in enumerate(X.T):
-        if i != idx:
-            if not np.any(X[:,idx] > col):
-                return False
+    for i, vec in enumerate(X):
+        if i != idx and not np.any(X[idx, :] > vec):
+            return False
     return True
 
-def get_pareto_indices(X):
-    for idx in range(X.shape[1]):
-        if is_pareto(idx, X):
-            yield idx
 
-def get_pareto_vectors(X):
-    for idx, col in enumerate(X.T):
+def split_indices_by_pareto(X):
+    pareto = []
+    not_pareto = []
+    for idx in range(X.shape[0]):
         if is_pareto(idx, X):
-            yield col
-
-def get_not_pareto_vectors(X):
-    for idx, col in enumerate(X.T):
-        if not is_pareto(idx, X):
-            yield col
+            pareto.append(idx)
+        else:
+            not_pareto.append(idx)
+    return pareto, not_pareto
 
 
 if __name__ == "__main__":
-    vec_pareto = get_pareto_vectors(X)
-    vec_nopareto = get_not_pareto_vectors(X)
+    indices_pareto, indices_not_pareto = split_indices_by_pareto(X)
 
-    fig, axes = plt.subplots(ncols=2, subplot_kw=dict(polar=True))
+    # чтобы на графе получился замкнутая линия, добавляем ещё столбец
+    X = np.append(X, np.reshape(X[:, 0], (n, 1)), axis=1)
 
-    theta = 2 * np.pi * np.arange(0, 1 + 1 / m, 1 / m)
+    vecs_pareto, vecs_not_pareto = X[indices_pareto, :], X[indices_not_pareto, :]
+    theta = 2 * np.pi * np.arange(m + 1, dtype=int) / m
 
-    for vec in vec_pareto:
-        axes[0].plot(theta, np.append(vec, vec[0]))
+    _, axes = plt.subplots(ncols=3, subplot_kw=dict(polar=True))
 
-    for vec in vec_nopareto:
-        axes[1].plot(theta, np.append(vec, vec[0]))
+    for ax in axes:
+        ax.set_rmax(scaler)
+        ax.set_thetagrids(np.arange(0, 360, 360 / m), labels=(np.arange(m) + 1))
+        ax.grid(True)
+
+    axes[0].set_title('Pareto vectors')
+    for vec in vecs_pareto:
+        axes[0].plot(theta, vec)
+
+    axes[1].set_title('Not Pareto vectors')
+    for vec in vecs_not_pareto:
+        axes[1].plot(theta, vec)
+
+    axes[2].set_title('All')
+    for vec in X:
+        axes[2].plot(theta, vec)
 
     plt.show()
